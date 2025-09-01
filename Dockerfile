@@ -4,11 +4,11 @@ RUN apk add --update git
 
 RUN mkdir -p /go/src/build
 
-COPY . /go/src/build
+COPY src /go/src/build
 
 WORKDIR /go/src/build
 
-RUN GOPROXY=direct go build -o wplace_watch
+RUN GOPROXY=direct go build -o wplace-watcher
 
 FROM alpine:latest
 
@@ -16,6 +16,6 @@ WORKDIR /app
 
 COPY --from=build /go/src/build/wplace_watch .
 
-RUN chmod +x ./wplace_watch
+RUN chmod +x ./wplace-watcher
 
 CMD [ "./wplace_watch" ]

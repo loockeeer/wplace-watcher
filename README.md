@@ -1,6 +1,6 @@
 ## **This is some of the messiest code I've ever written, and is planned to be overhauled. Expect changes (and updates!)**
 
-# WPlace Watch
+# wplacer-watcher
 
 Drawing on the WPlace canvas can be... hard and long at times. Especially when griefers come to annoy.
 This project should help those with many projects they wish to defend against griefing !

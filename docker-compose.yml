@@ -1,6 +1,6 @@
 services:
-  wplace_watch:
-    image: ghcr.io/loockeeer/wplace-watch
+  wplace-watcher:
+    image: ghcr.io/loockeeer/wplace-watcher
     restart: always
     volumes:
       - type: bind
