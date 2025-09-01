@@ -1,0 +1,4 @@
+patterns/*.png
+webhook_format.json.tmpl
+config.yaml
+.idea

@@ -1,0 +1,14 @@
+services:
+  wplace_watch:
+    image: ghcr.io/loockeeer/wplace-watch
+    restart: always
+    volumes:
+      - type: bind
+        source: ./config.yaml
+        target: /data/config.yaml
+      - type: bind
+        source: ./webhook_format.json.tmpl
+        target: /data/webhook_format.json.tmpl
+      - ./patterns:/data/patterns
+    environment:
+      - CONFIG_FILE=/data/config.yaml
