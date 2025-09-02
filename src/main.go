@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
-	"iter"
 	"log"
 	"net/http"
 	"os"
@@ -19,128 +19,52 @@ import (
 )
 
 type Config struct {
-	RefreshRate       int    `yaml:"refresh_rate"`
-	WebhookURL        string `yaml:"webhook_url"`
-	WebhookFormat     string `yaml:"webhook_format"`
-	PatternFolder     string `yaml:"pattern_folder"`
-	FolderRefreshRate int    `yaml:"folder_refresh_rate"`
-	RemindTime        int    `yaml:"remind_time"`
+	RefreshRate          int    `yaml:"refresh_rate"`
+	WebhookURL           string `yaml:"webhook_url"`
+	WebhookFormat        string `yaml:"webhook_format"`
+	PatternDirectory     string `yaml:"pattern_directory"`
+	DirectoryRefreshRate int    `yaml:"directory_refresh_rate"`
+	RemindTime           int    `yaml:"remind_time"`
 }
 
-type Pattern struct {
-	Name string
-	Data image.Image
-	X    int
-	Y    int
-	Tile
-}
-type PatternInfo struct {
-	Pattern
-	DefacedSince time.Time
-	Errors       int
-}
-
-type PatternPos struct {
+type Position struct {
 	X, Y int
-	Tile
 }
-
-var config Config
-var patterns map[PatternPos]*PatternInfo
-var webhookFormat string
+type Pattern struct {
+	Name         string
+	Data         image.Image
+	Errors       int
+	DefacedSince time.Time
+	Tile         Position
+	TilePosition Position
+}
 
 type TemplateStruct struct {
-	DefacedSince time.Time
 	Errors       int
 	ErrorsBefore int
 	PatternName  string
-	PatternPos   PatternPos
+	PatternTile  Position
+	PatternPos   Position
 }
 
-type ComparedPattern struct {
-	Pattern
-	Errored int
+type ExpectedCellData struct {
+	color.RGBA
+	patternName string
 }
+type ExpectedTileData = [1000][1000]ExpectedCellData
 
-type Tile struct {
-	Tx, Ty int
-	Data   *image.Image
-}
+var config Config
+var patterns map[string]Pattern
+var webhookTemplate *template.Template
+var needed map[Position]ExpectedTileData
 
-func NewTile(Tx, Ty int) Tile {
-	return Tile{Tx, Ty, nil}
-}
-
-func GetImage(tile Tile) (Tile, error) {
-	res, err := http.Get(fmt.Sprintf("https://backend.wplace.live/files/s0/tiles/%d/%d.png", tile.Tx, tile.Ty))
+// Updates every pattern from the pattern directory
+func UpdatePatterns(directory string) {
+	entries, err := os.ReadDir(directory)
 	if err != nil {
-		return tile, err
+		log.Fatalln("Unable to open pattern directory", err)
 	}
-
-	defer res.Body.Close()
-	img, err := png.Decode(res.Body)
-	if err != nil {
-		return tile, err
-	}
-	return Tile{tile.Tx, tile.Ty, &img}, nil
-}
-
-func ComputeNecessaryTilesForPattern(pattern Pattern, needed map[Tile]*Tile) {
-	width := pattern.Data.Bounds().Dx()
-	height := pattern.Data.Bounds().Dy()
-	for Tx := pattern.Tx; Tx <= pattern.Tx+(pattern.X+width)/1000; Tx++ {
-		for Ty := pattern.Ty; Ty <= pattern.Ty+(pattern.Y+height)/1000; Ty++ {
-			tile := NewTile(Tx, Ty)
-			needed[tile] = &tile
-		}
-	}
-}
-
-func Compare(patterns iter.Seq[Pattern], needed map[Tile]Tile) map[Pattern]*ComparedPattern {
-	var compared map[Pattern]*ComparedPattern
-	compared = make(map[Pattern]*ComparedPattern)
-	for pattern := range patterns {
-		compared[pattern] = &ComparedPattern{pattern, 0}
-		width := pattern.Data.Bounds().Dx()
-		height := pattern.Data.Bounds().Dy()
-		for x := 0; x < width; x++ {
-			for y := 0; y < height; y++ {
-				// Get tile associated with this pixel
-				tileId := NewTile(pattern.Tx+(x+pattern.X)/1000, pattern.Ty+(y+pattern.Y)/1000)
-				if tile, ok := needed[tileId]; ok {
-					if tile.Data != nil {
-						r, g, b, a := (*tile.Data).At((x+pattern.X)%1000, (y+pattern.Y)%1000).RGBA()
-
-						rp, gp, bp, ap := pattern.Data.At(x, y).RGBA()
-						if ap == 0 {
-							continue
-						}
-						if r != rp || g != gp || b != bp || a != ap {
-							if cmp, ok := compared[pattern]; ok {
-								cmp.Errored++
-							} else {
-								compared[pattern] = &ComparedPattern{pattern, 1}
-							}
-						}
-					} else {
-						// error
-					}
-				} else {
-					// error
-				}
-			}
-		}
-	}
-	return compared
-}
-
-func UpdatePatterns(folder string) {
-	entries, err := os.ReadDir(config.PatternFolder)
-	if err != nil {
-		log.Fatalln("Unable to open pattern folder", err)
-	}
-	var newPatterns map[PatternPos]*PatternInfo
-	newPatterns = make(map[PatternPos]*PatternInfo)
+	newPatterns := make(map[string]Pattern)
 	for _, e := range entries {
 		bits := strings.Split(e.Name(), ".")
 		if len(bits) != 6 {
@@ -155,7 +79,7 @@ func UpdatePatterns(folder string) {
 			log.Printf("[WARNING] Malformed pattern name %s\n", e.Name())
 			continue
 		}
-		reader, err := os.Open(path.Join(config.PatternFolder, e.Name()))
+		reader, err := os.Open(path.Join(directory, e.Name()))
 		if err != nil {
 			log.Printf("[WARNING] Unable to read pattern file %s\n", e.Name())
 			continue
@@ -167,20 +91,137 @@ func UpdatePatterns(folder string) {
 			continue
 		}
 
-		ppos := PatternPos{X: x, Y: y, Tile: NewTile(Tx, Ty)}
-		p := Pattern{Name: bits[0], Data: data, X: x, Y: y, Tile: NewTile(Tx, Ty)}
-		if pi, ok := patterns[ppos]; ok {
-			pi.Pattern = p
-			newPatterns[ppos] = pi
-
+		if oldPattern, ok := patterns[bits[0]]; ok {
+			oldPattern.Tile = Position{Tx, Ty}
+			oldPattern.TilePosition = Position{x, y}
+			oldPattern.Data = data
+			newPatterns[bits[0]] = oldPattern
 		} else {
-			newPatterns[ppos] = &PatternInfo{Errors: 0, DefacedSince: time.Now(), Pattern: p}
-
+			newPatterns[bits[0]] = Pattern{bits[0], data, 0, time.Now(), Position{Tx, Ty}, Position{x, y}}
 		}
 	}
 	patterns = newPatterns
 }
 
+// Computes the tile masks; i.e. for every tile that at least one (1) pattern covers, the pixels that should (according to the pattern(s)) be there
+func ComputeTileMasks(patterns map[string]Pattern) map[Position]ExpectedTileData {
+	out := make(map[Position]ExpectedTileData)
+	for _, pattern := range patterns {
+		width := pattern.Data.Bounds().Dx()
+		height := pattern.Data.Bounds().Dy()
+		for Tx := pattern.Tile.X; Tx <= pattern.Tile.X+(pattern.TilePosition.X+width)/1000; Tx++ {
+			for Ty := pattern.Tile.Y; Ty <= pattern.Tile.Y+(pattern.TilePosition.Y+height)/1000; Ty++ {
+				pos := Position{Tx, Ty}
+				if etd, ok := out[pos]; ok {
+					for x := Tx * 1000; x < min((Tx+1)*1000, width); x++ {
+						for y := Ty * 1000; y < min((Ty+1)*1000, height); y++ {
+							etd[x][y].patternName = pattern.Name
+							etd[x][y].RGBA = pattern.Data.At(x, y).(color.RGBA)
+						}
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// Fetches tile image associated with a position from wplace's tile servers
+func FetchTileImage(pos Position) (image.Image, error) {
+	res, err := http.Get(fmt.Sprintf("https://backend.wplace.live/files/s0/tiles/%d/%d.png", pos.X, pos.Y))
+	if err != nil {
+		return nil, err
+	}
+
+	defer res.Body.Close()
+	img, err := png.Decode(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
+}
+
+// Compares the provided tiles masks to the fetched tile images and reports which drawings have been defaced, and by how much
+func CompareTileMasks(tiles map[Position]image.Image, tileMask map[Position]ExpectedTileData) map[string]int {
+	out := make(map[string]int)
+	for pos, mask := range tileMask {
+		tile, ok := tiles[pos]
+		if !ok {
+			log.Println("[WARNING] Missing tile")
+		}
+		for x := 0; x < 1000; x++ {
+			for y := 0; y < 1000; y++ {
+				if mask[x][y].A == 0 {
+					if mask[x][y].RGBA != tile.At(x, y).(color.RGBA) {
+						if _, ok := out[mask[x][y].patternName]; !ok {
+							out[mask[x][y].patternName] = 1
+						} else {
+							out[mask[x][y].patternName]++
+						}
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// Sends defacement updates through the provided webhook
+func SendUpdates(patterns map[string]Pattern, errorsMap map[string]int) {
+	for _, pattern := range patterns {
+		patternErrors, ok := errorsMap[pattern.Name]
+		if !ok {
+			patternErrors = 0
+		}
+		// if more errors are found, generate a webhook body and send it
+		// if there are no errors (after there being some) ...
+		// after remind delay, ...
+		errorsBefore := pattern.Errors
+		pattern.Errors = patternErrors
+		log.Printf("[INFO] Pattern (%s) found with (%d)->(%d) errors\n", pattern.Name, errorsBefore, patternErrors)
+		if (patternErrors > errorsBefore) ||
+			(patternErrors == 0 && errorsBefore != 0) ||
+			time.Now().Add(time.Duration(config.RemindTime)).Before(time.Now()) {
+			log.Printf("[INFO] Sending webhook for pattern (%s)\n", pattern.Name)
+			pattern.DefacedSince = time.Now()
+			ts := TemplateStruct{
+				Errors:       patternErrors,
+				ErrorsBefore: errorsBefore,
+				PatternName:  pattern.Name,
+				PatternTile:  pattern.Tile,
+				PatternPos:   pattern.TilePosition,
+			}
+			tmp, err := webhookTemplate.Clone()
+			if err != nil {
+				log.Println("[ERROR] Unable to clone template :", err)
+				continue
+			}
+			w := bytes.NewBuffer(nil)
+			err = tmp.Execute(w, ts)
+			if err != nil {
+				log.Println("[ERROR] Unable to execute template :", err)
+				continue
+			}
+			res, err := http.Post(config.WebhookURL, "application/json", bytes.NewBuffer(w.Bytes()))
+			if err != nil {
+				if res != nil {
+					log.Println("[ERROR] Unable to send webhook :", res.StatusCode)
+				} else {
+					log.Println("[ERROR] Unable to send webhook : [nil response]")
+				}
+				continue
+			}
+			if res.StatusCode != http.StatusNoContent {
+				log.Printf("[ERROR] Invalid status code (Unable to send webhook) %d\n", res.StatusCode)
+				buffer := bytes.NewBuffer(nil)
+				_, _ = buffer.ReadFrom(res.Body)
+				log.Println("error message :", string(buffer.Bytes()))
+			}
+		}
+	}
+}
+
+// Config parsing, webhook template parsing and initial pattern list creation
 func init() {
 	file, err := os.ReadFile(os.Getenv("CONFIG_FILE"))
 	if err != nil {
@@ -194,87 +235,42 @@ func init() {
 	if err != nil {
 		log.Fatalln("Unable to open webhook format", err)
 	}
-	webhookFormat = string(content)
-	fmt.Println("[INFO] Config parsed")
-	patterns = make(map[PatternPos]*PatternInfo)
-	UpdatePatterns(config.PatternFolder)
-	fmt.Println("[INFO] Patterns parsed")
+	webhookTemplate, err = template.New("template").Parse(string(content))
+	if err != nil {
+		log.Fatalf("[ERROR] Unable to parse template: %s\n", err)
+	}
+	log.Println("[INFO] Config parsed")
+	patterns = make(map[string]Pattern)
+	UpdatePatterns(config.PatternDirectory)
+	log.Println("[INFO] Patterns parsed")
 }
 
+// Main loop
 func main() {
 	refreshTicker := time.Tick(time.Duration(config.RefreshRate) * time.Second)
-	refreshFolderTicker := time.Tick(time.Duration(config.FolderRefreshRate) * time.Second)
-	fmt.Println("[INFO] Server started")
+	refreshDirTicker := time.Tick(time.Duration(config.DirectoryRefreshRate) * time.Second)
+	log.Println("[INFO] Server started")
 	for {
 		select {
-		case <-refreshFolderTicker:
-			log.Println("[INFO] Refreshing folder")
-			UpdatePatterns(config.PatternFolder)
+		case <-refreshDirTicker:
+			log.Println("[INFO] Refreshing directory (1/2)")
+			UpdatePatterns(config.PatternDirectory)
+			log.Println("[INFO] Computing tile masks (2/2)")
+			needed = ComputeTileMasks(patterns)
+			log.Println("[INFO] Done with directory refresh")
 		case <-refreshTicker:
 			log.Println("[INFO] Refreshing patterns")
-			var needed map[Tile]*Tile
-			needed = make(map[Tile]*Tile)
-			for _, pinfo := range patterns {
-				ComputeNecessaryTilesForPattern(pinfo.Pattern, needed)
-			}
-			var fetchedTiles map[Tile]Tile
-			fetchedTiles = make(map[Tile]Tile)
-			for tile := range needed {
-				newTile, err := GetImage(tile)
+
+			fetchedTiles := make(map[Position]image.Image)
+			for pos, _ := range needed {
+				img, err := FetchTileImage(pos)
 				if err != nil {
-					return
+					log.Printf("[ERROR] Unable to fetch tile (%d,%d) : %s\n", pos.X, pos.Y, err)
 				}
-				fetchedTiles[tile] = newTile
+				fetchedTiles[pos] = img
 			}
-			f := func(yield func(Pattern) bool) {
-				for _, k := range patterns {
-					if !yield(k.Pattern) {
-						return
-					}
-				}
-			}
-			compared := Compare(f, fetchedTiles)
-			for pt, cmp := range compared {
-				log.Println(pt, cmp)
-				ppos := PatternPos{X: pt.X, Y: pt.Y, Tile: pt.Tile}
-				if pi, ok := patterns[ppos]; ok {
-					if pi.Errors < cmp.Errored ||
-						(pi.Errors != 0 && cmp.Errored == 0) ||
-						(pi.Errors != 0 && pi.DefacedSince.Add(time.Second*time.Duration(config.RemindTime)).Before(time.Now())) {
-						pi.DefacedSince = time.Now()
-						ts := TemplateStruct{
-							DefacedSince: pi.DefacedSince,
-							Errors:       cmp.Errored,
-							ErrorsBefore: pi.Errors,
-							PatternName:  pt.Name,
-							PatternPos:   ppos,
-						}
-						pi.Errors = cmp.Errored
-						tmp, err := template.New("template").Parse(webhookFormat)
-						if err != nil {
-							log.Printf("[ERROR] Unable to parse template: %s\n", err)
-						}
-						w := bytes.NewBuffer(nil)
-						err = tmp.Execute(w, ts)
-						if err != nil {
-							log.Printf("[ERROR] Unable to execute template: %s\n", err)
-						}
-						res, err := http.Post(config.WebhookURL, "application/json", bytes.NewBuffer(w.Bytes()))
-						if err != nil {
-							log.Printf("[ERROR] Unable to send webhook %d\n", res.StatusCode)
-						}
-						if res.StatusCode != http.StatusNoContent {
-							log.Printf("[ERROR] Invalid status code (Unable to send webhook) %d\n", res.StatusCode)
-							buffer := bytes.NewBuffer(nil)
-							_, _ = buffer.ReadFrom(res.Body)
-							log.Println("error message :", string(buffer.Bytes()))
-						}
-					}
-					pi.Errors = cmp.Errored
-				} else {
-					panic("unable to find pattern in patterns")
-				}
-			}
+			compared := CompareTileMasks(fetchedTiles, needed)
+			SendUpdates(patterns, compared)
 		}
 	}
 }
