@@ -14,8 +14,8 @@ FROM alpine:latest
 
 WORKDIR /app
 
-COPY --from=build /go/src/build/wplace_watch .
+COPY --from=build /go/src/build/wplace-watcher .
 
 RUN chmod +x ./wplace-watcher
 
-CMD [ "./wplace_watch" ]
+CMD [ "./wplace-watcher" ]
