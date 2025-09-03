@@ -44,7 +44,7 @@ Patterns to watch for should be placed in the `patterns` directory, following a 
 NAME.Tx.Ty.x.y.png
 ```
 Where, 
-- `NAME` is a custom name used to identify this pattern. Not necessarily unique
+- `NAME` is a custom name used to identify this pattern. Must be unique ! It serves as a unique identifier !
 - `Tx`, `Ty`, `x`, `y` are the coordinates (in order) where your pattern (its top left corner) is placed. These coordinates are often found using Blue Marble 
 
 After waiting a short (or long) while (depending on your `directory_refresh_rate` setting ! Which I would avoid setting to 0 or 1 so as to avoid strain on your equipment), the software will have taken notice of the new pattern !
