@@ -58,7 +58,7 @@ var patterns map[string]Pattern
 var webhookTemplate *template.Template
 var needed map[Position]ExpectedTileData
 
-// Updates every pattern from the pattern directory
+// UpdatePatterns Updates every pattern from the pattern directory
 func UpdatePatterns(directory string) {
 	entries, err := os.ReadDir(directory)
 	if err != nil {
@@ -103,7 +103,7 @@ func UpdatePatterns(directory string) {
 	patterns = newPatterns
 }
 
-// Computes the tile masks; i.e. for every tile that at least one (1) pattern covers, the pixels that should (according to the pattern(s)) be there
+// ComputeTileMasks Computes the tile masks; i.e. for every tile that at least one (1) pattern covers, the pixels that should (according to the pattern(s)) be there
 func ComputeTileMasks(patterns map[string]Pattern) map[Position]ExpectedTileData {
 	out := make(map[Position]ExpectedTileData)
 	for _, pattern := range patterns {
@@ -126,7 +126,7 @@ func ComputeTileMasks(patterns map[string]Pattern) map[Position]ExpectedTileData
 	return out
 }
 
-// Fetches tile image associated with a position from wplace's tile servers
+// FetchTileImage Fetches tile image associated with a position from wplace's tile servers
 func FetchTileImage(pos Position) (image.Image, error) {
 	res, err := http.Get(fmt.Sprintf("https://backend.wplace.live/files/s0/tiles/%d/%d.png", pos.X, pos.Y))
 	if err != nil {
@@ -166,7 +166,7 @@ func CompareTileMasks(tiles map[Position]image.Image, tileMask map[Position]Expe
 	return out
 }
 
-// Sends defacement updates through the provided webhook
+// SendUpdates Sends defacement updates through the provided webhook
 func SendUpdates(patterns map[string]Pattern, errorsMap map[string]int) {
 	for _, pattern := range patterns {
 		patternErrors, ok := errorsMap[pattern.Name]
