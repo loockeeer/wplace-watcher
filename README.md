@@ -1,8 +1,6 @@
-## **This is some of the messiest code I've ever written, and is planned to be overhauled. Expect changes (and updates!)**
+# wplace-watcher
 
-# wplacer-watcher
-
-Drawing on the WPlace canvas can be... hard and long at times. Especially when griefers come to annoy.
+Drawing on the WPlace canvas can be... hard, and long at times. Especially when griefers come to annoy.
 This project should help those with many projects they wish to defend against griefing !
 Every time one of the referenced drawings is griefed, a message is sent to a WebHook, allowing for customisation and easy translation.
 When the drawing is restored, it is possible to have another message sent to you !
