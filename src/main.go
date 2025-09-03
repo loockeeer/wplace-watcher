@@ -262,7 +262,7 @@ func main() {
 			log.Println("[INFO] Refreshing patterns")
 
 			fetchedTiles := make(map[Position]image.Image)
-			for pos, _ := range needed {
+			for pos := range needed {
 				img, err := FetchTileImage(pos)
 				if err != nil {
 					log.Printf("[ERROR] Unable to fetch tile (%d,%d) : %s\n", pos.X, pos.Y, err)
