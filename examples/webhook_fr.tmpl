@@ -1,13 +1,11 @@
 {{if eq .Errors 0}}
 {
-  "content": "",
-  "tts": false,
   "embeds": [
     {
       "title": "{{.PatternName}}",
       "color": 1696256,
       "footer": {
-        "text": "Position : {{.PatternPos.Tile.Tx}} {{.PatternPos.Tile.Ty}} {{.PatternPos.X}} {{.PatternPos.Y}}"
+        "text": "Position : {{.PatternTile.X}} {{.PatternTile.Y}} {{.PatternPos.X}} {{.PatternPos.Y}}"
       },
       "author": {
         "name": "Dessin restauré !"
@@ -15,11 +13,8 @@
       "fields": []
     }
   ],
-  "components": [],
-  "actions": {},
-  "flags": 0,
-    "username": "Police (ACAB)",
-    "avatar_url": "https://p1.hiclipart.com/preview/29/255/586/animated-emoji-thumb-signal-smiley-emoticon-drawing-text-yellow-cartoon-png-clipart.jpg"
+  "username": "Police (ACAB)",
+  "avatar_url": "https://p1.hiclipart.com/preview/29/255/586/animated-emoji-thumb-signal-smiley-emoticon-drawing-text-yellow-cartoon-png-clipart.jpg"
 }
 {{else}}
 {
@@ -28,26 +23,26 @@
       "title": "{{.PatternName}}",
       "color": 14876672,
       "footer": {
-        "text": "Position : {{.PatternPos.Tile.Tx}} {{.PatternPos.Tile.Ty}} {{.PatternPos.X}} {{.PatternPos.Y}}"
+        "text": "Position : {{.PatternTile.X}} {{.PatternTile.Y}} {{.PatternPos.X}} {{.PatternPos.Y}}"
       },
       "author": {
         "name": "🚨Alerte vandale {{- if (eq .Errors .ErrorsBefore) }}(Rappel){{ end -}}"
       },
       "fields": [
         {
-          "name": "Erreurs Avant",
+          "name": "Erreurs avant",
           "value": "{{.ErrorsBefore}}",
           "inline": true
         },
         {
-          "name": "Erreurs Après",
+          "name": "Erreurs après",
           "value": "{{.Errors}}",
           "inline": true
         }
       ]
     }
   ],
-    "username": "Police (ACAB)",
-    "avatar_url": "https://images.emojiterra.com/google/noto-emoji/unicode-15/color/512px/1f6a8.png"
+  "username": "Police (ACAB)",
+  "avatar_url": "https://images.emojiterra.com/google/noto-emoji/unicode-15/color/512px/1f6a8.png"
 }
 {{end}}

@@ -29,11 +29,15 @@ Simply run `docker compose up -d` and your service should now be running, but ho
 If you are looking to create your own Webhook message, note that I won't provide any tutorial apart from this :
 - The webhook format language is Golang's template engine, which is LARGELY documented on the internet
 - These variables can be used
-```yaml
-Errors       int # The number of wrong pixels
-ErrorsBefore int # The number of wrong pixels , *before* the alert Was triggered (usually 0, can be non-zero if the trigger is due to further damage)
-PatternName  string # The pattern's name
-PatternPos   PatternPos # The pattern's position (PatternPos.Tx,.Ty,.X,.Y are all integers)
+```go
+package main
+type TemplateData struct {
+    Errors       int                    // The number of wrong pixels
+    ErrorsBefore int                    // The number of wrong pixels, *before* the alert Was triggered (usually 0, can be non-zero if the trigger is due to further damage)
+    PatternName  string                 // The pattern's name
+    PatternPos   PatternPos             // The pattern's position (PatternPos.Tx,.Ty,.X,.Y are all integers)
+    Info         map[string]interface{} // Custom data field (read more in the Patterns section) 
+}
 ```
 You can always assume that `Errors` being `0` means that the drawing was refaced.
 Not sending a message through the Webhook is not «officially» supported, but any invalid message you generate will only result in a warning/error message and won't crash the app, since any non-ok HTTP code is non-fatal.
@@ -42,6 +46,10 @@ Not sending a message through the Webhook is not «officially» supported, but a
 Patterns to watch for should be placed in the `patterns` directory, following a strict naming convention :
 ```
 NAME.Tx.Ty.x.y.png
+```
+Pattern information (additional data to be used inside templates) follow a similar naming convention and must be placed in the same directory :
+```
+NAME.Tx.Ty.x.y.json
 ```
 Where, 
 - `NAME` is a custom name used to identify this pattern. Must be unique ! It serves as a unique identifier !
