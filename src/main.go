@@ -202,7 +202,7 @@ func SendUpdates(patterns map[string]*Pattern, errorsMap map[string]int) {
 		log.Printf("[INFO] Pattern (%s) found with (%d)->(%d) errors\n", pattern.Name, errorsBefore, patternErrors)
 		if (patternErrors > errorsBefore) ||
 			(patternErrors == 0 && errorsBefore != 0) ||
-			time.Now().Add(time.Duration(config.RemindTime)).Before(time.Now()) {
+			(patternErrors > 0 && time.Now().Add(time.Duration(config.RemindTime)).Before(time.Now())) {
 			log.Printf("[INFO] Sending webhook for pattern (%s)\n", pattern.Name)
 			pattern.DefacedSince = time.Now()
 			ts := TemplateStruct{
