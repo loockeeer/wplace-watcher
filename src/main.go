@@ -131,18 +131,41 @@ func ComputeTileMasks(patterns map[string]*Pattern) map[Position]*TileMask {
 				}
 				dTx := Tx - pattern.Tile.X
 				dTy := Ty - pattern.Tile.Y
-				for x := 1000 * dTx; x < min(1000*dTx+1000, width); x++ {
-					for y := 1000 * dTy; y < min(1000*dTy+1000, height); y++ {
-						c := pattern.Data.At(x, y)
-						if _, _, _, a := c.RGBA(); a != 0 {
-							(*mask)[(pattern.TilePosition.X+x)%1000][(pattern.TilePosition.Y+y)%1000].patternName = pattern.Name
-							(*mask)[(pattern.TilePosition.X+x)%1000][(pattern.TilePosition.Y+y)%1000].RGBA = color.RGBAModel.Convert(c).(color.RGBA)
+				for x := 0; x < 1000; x++ {
+					for y := 0; y < 1000; y++ {
+						imgX := dTx*1000 + x - pattern.TilePosition.X
+						imgY := dTy*1000 + y - pattern.TilePosition.Y
+						if imgX < width && imgY < height {
+							c := pattern.Data.At(imgX, imgY)
+							(*mask)[x][y].patternName = pattern.Name
+							(*mask)[x][y].RGBA = color.RGBAModel.Convert(c).(color.RGBA)
 						}
 					}
 				}
 			}
 		}
 	}
+	/*
+		for pos, tm := range out {
+			img := image.NewRGBA(image.Rect(0, 0, 1000, 1000))
+			for x := 0; x < 1000; x++ {
+				for y := 0; y < 1000; y++ {
+					ecd := (*tm)[x][y]
+					img.Set(x, y, ecd.RGBA)
+				}
+			}
+			file, err := os.OpenFile(fmt.Sprintf("./%d.%d.png", pos.X, pos.Y), os.O_CREATE|os.O_WRONLY, os.ModePerm)
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = png.Encode(file, img)
+			if err != nil {
+				log.Fatal(err)
+			}
+			_ = file.Close()
+		}
+	*/ // Debug code
+
 	return out
 }
 
