@@ -179,7 +179,7 @@ func FetchTileImage(pos Position) (image.Image, error) {
 	defer res.Body.Close()
 	img, err := png.Decode(res.Body)
 	if err != nil {
-		return nil, err
+		img = image.NewRGBA(image.Rect(0, 0, 1000, 1000))
 	}
 	return img, nil
 }
