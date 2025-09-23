@@ -60,3 +60,4 @@ Removing a pattern from the watchlist is as simple as deleting it, or moving it 
 
 In order to allow for gaps in your drawings, transparency is required, and the format I chose for this project is png.
 This likely won't change, and in the event of you placing a non-png encoded file in the directory, it would not be read properly. Note that this wouldn't crash the server though.
+Providing a `webhook_url` field in the info file will override the default webhook for this pattern and send it to this url instead

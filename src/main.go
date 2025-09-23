@@ -247,6 +247,13 @@ func SendUpdates(patterns map[string]*Pattern, errorsMap map[string]int) {
 				log.Println("[ERROR] Unable to execute template :", err)
 				continue
 			}
+			wurl, ok := pattern.Info["webhook_url"]
+			if ok {
+				wurl, ok = wurl.(string)
+			}
+			if !ok {
+				wurl = config.WebhookURL
+			}
 			res, err := http.Post(config.WebhookURL, "application/json", w)
 			if err != nil {
 				if res != nil {
